@@ -1,0 +1,45 @@
+body {
+    font-size: 20pt;
+    margin:10px;
+    text-align: center;
+    color:white;
+    font-weight: bolder;
+    font-family: Arial;
+    background-image:linear-gradient(45deg,#FEAC5E,#C779D0,#4BC0C8);
+}
+.highlight-hint{
+  background-color: greenyellow
+}
+#myBoard{
+  padding:10px;
+  margin:0 auto;
+  /*background-image:linear-gradient(45deg,#FEAC5E,#C779D0,#4BC0C8);
+  left:50%;
+  position:fixed;
+  transform: translate(-50%);*/
+}
+#advantageBox{
+  background-color: black;
+  width:100%;
+  height:20px;
+  margin-bottom: 2%;
+}
+#advantageBar{
+  background: white;
+  width:50%;
+  height:20px;
+}
+.highlight-white {
+  background-color: limegreen
+}
+
+.highlight-black {
+  background-color: aliceblue
+}
+button {
+  background-image:linear-gradient(90deg,#FEAC5E,#C779D0,#4BC0C8);
+  padding:20px;
+  color:white;
+  border:2px solid white;
+  background-color: #4C9F6E;
+}

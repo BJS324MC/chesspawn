@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tournament</title>
+  <link rel="stylesheet" href="chess/chessboard-1.0.0.min.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+  <script src="chess/chess.js"></script>
+  <script src="chess/chessboard-1.0.0.min.js"></script>
+</head>
+
+<body>
+  <!--<script src="https://www.gstatic.com/firebasejs/8.7.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.7.0/firebase-database.js"></script>
+  <script src="database.js"></script>-->
+  <div id="myBoard"></div>
+  <script>
+let s=Math.min(innerWidth,innerHeight);
+document.getElementById("myBoard").style.width=s/2+"px"
+</script>
+  <span id="status"></span>
+  <p id="notif">Nothing is happening right now...</p>
+  <p><span id="advantageColor">Neither side</span> has the advantage
+    (+<span id="advantageNumber">0</span>).</p>
+  <div id="advantageBox">
+    <div id='advantageBar'></div>
+  </div>
+  <button onclick='notify(startColour);setTimeout(()=>{makeBestMove(game.turn(),4);notify(0)},100)'>Play Best Move</button>
+  <button id="aibt">AI vs AI</button>
+  <button onclick='undo()'>Undo</button>
+  <button onclick='redo()'>Redo</button>
+  <button onclick="board.flip()">Flip</button>
+  <button onclick="copy(game.fen())">Copy FEN</button>
+  <script src="board.js"></script>
+</body>
+
+</html>
