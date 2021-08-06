@@ -51,6 +51,7 @@ html,body{
 button {
   background-image:linear-gradient(90deg,#FEAC5E,#C779D0,#4BC0C8);
   padding:20px;
+  margin:2px;
   color:white;
   border:2px solid white;
   background-color: #4C9F6E;
