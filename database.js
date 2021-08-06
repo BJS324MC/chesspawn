@@ -10,17 +10,10 @@ var firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 var db = firebase.database(),
-    tab = db.ref("hash"),
-    table={};
+    tab = db.ref("openings");
 tab.get().then(snap=>{
-  console.log("loaded")
-  //setTimeout(()=>compVsComp(startColour),2000);
   if(snap.exists()){
-    table=snap.val();
-    let idx=~~(Math.random()*Object.keys(table).length);
-    //loadBoard(Object.keys(table)[idx].replace(/&/g,"/"));
+    openings=snap.val();
+    setOpening();
   }
 });
-function write(){
-  tab.update(table);
-};

@@ -8,26 +8,28 @@
 var STACK_SIZE = 6000; // maximum size of undo stack
 
 var board = null
-var $board = $('#myBoard')
+var $board = document.querySelector('#myBoard')
 var game = new Chess()
-var table = {}
-var depthed=3;
+var table = {};
+var depthed = 3;
 var pieceValue = {
   p: 1,
   b: 3,
   n: 3,
   r: 5,
-  q: 7
+  q: 9
 }
 var globalSum = 0 // always from black's perspective. Negative for white's perspective.
 var whiteSquareGrey = '#ff8880'
 var blackSquareGrey = '#b56762'
-var inf=100000000;
+var inf = 100000000;
 
 var squareClass = 'square-55d63'
 var squareToHighlight = null
 var colorToHighlight = null
 var positionCount;
+var evalt;
+var againstAI=false;
 var startColour = "white";
 
 var config = {
@@ -42,75 +44,81 @@ var config = {
 board = Chessboard('myBoard', config)
 
 timer = null;
+$board.addEventListener("touchmove",e=>e.preventDefault())
 
 /* 
  * Piece Square Tables, adapted from Sunfish.py:
  * https://github.com/thomasahle/sunfish/blob/master/sunfish.py
  */
 
-var weights = { 'p': 100, 'n': 280, 'b': 320, 'r': 479, 'q': 929, 'k': 60000, 'k_e': 60000 };
+var sortType={'p':1,'n':0,'b':2,'r':4,'q':3,'k':5};
+var weights = { 'p': 100, 'n': 280, 'b': 320, 'r': 479, 'q': 929, 'k': 20000, 'k_e': 20000 };
 var pst_w = {
-  'p': [
-            [100, 100, 100, 100, 105, 100, 100, 100],
-            [78, 83, 86, 73, 102, 82, 85, 90],
-            [7, 29, 21, 44, 40, 31, 44, 7],
-            [-17, 16, -2, 15, 14, 0, 15, -13],
-            [-26, 3, 10, 9, 6, 1, 0, -23],
-            [-22, 9, 5, -11, -10, -2, 3, -19],
-            [-31, 8, -7, -37, -36, -14, 3, -31],
-            [0, 0, 0, 0, 0, 0, 0, 0]
-        ],
-  'n': [
-            [-66, -53, -75, -75, -10, -55, -58, -70],
-            [-3, -6, 100, -36, 4, 62, -4, -14],
-            [10, 67, 1, 74, 73, 27, 62, -2],
-            [24, 24, 45, 37, 33, 41, 25, 17],
-            [-1, 5, 31, 21, 22, 35, 2, 0],
-            [-18, 10, 13, 22, 18, 15, 11, -14],
-            [-23, -15, 2, 0, 2, 0, -23, -20],
-            [-74, -23, -26, -24, -19, -35, -22, -69]
-        ],
-  'b': [
-            [-59, -78, -82, -76, -23, -107, -37, -50],
-            [-11, 20, 35, -42, -39, 31, 2, -22],
-            [-9, 39, -32, 41, 52, -10, 28, -14],
-            [25, 17, 20, 34, 26, 25, 15, 10],
-            [13, 10, 17, 23, 17, 16, 0, 7],
-            [14, 25, 24, 15, 8, 25, 20, 15],
-            [19, 20, 11, 6, 7, 6, 20, 16],
-            [-7, 2, -15, -12, -14, -15, -10, -10]
-        ],
-  'r': [
-            [35, 29, 33, 4, 37, 33, 56, 50],
-            [55, 29, 56, 67, 55, 62, 34, 60],
-            [19, 35, 28, 33, 45, 27, 25, 15],
-            [0, 5, 16, 13, 18, -4, -9, -6],
-            [-28, -35, -16, -21, -13, -29, -46, -30],
-            [-42, -28, -42, -25, -25, -35, -26, -46],
-            [-53, -38, -31, -26, -29, -43, -44, -53],
-            [-30, -24, -18, 5, -2, -18, -31, -32]
-        ],
-  'q': [
-            [6, 1, -8, -104, 69, 24, 88, 26],
-            [14, 32, 60, -10, 20, 76, 57, 24],
-            [-2, 43, 32, 60, 72, 63, 43, 2],
-            [1, -16, 22, 17, 25, 20, -13, -6],
-            [-14, -15, -2, -5, -1, -10, -20, -22],
-            [-30, -6, -13, -11, -16, -11, -16, -27],
-            [-36, -18, 0, -19, -15, -15, -21, -38],
-            [-39, -30, -31, -13, -31, -36, -34, -42]
-        ],
-  'k': [
-            [4, 54, 47, -99, -99, 60, 83, -62],
-            [-32, 10, 55, 56, 56, 55, 10, 3],
-            [-62, 12, -57, 44, -67, 28, 37, -31],
-            [-55, 50, 11, -4, -19, 13, 0, -49],
-            [-55, -43, -52, -28, -51, -47, -8, -50],
-            [-47, -42, -43, -79, -64, -32, -29, -32],
-            [-4, 3, -14, -50, -57, -18, 13, 4],
-            [17, 30, -3, -14, 6, -1, 40, 18]
-        ],
-
+  p: [
+  		[0, 0, 0, 0, 0, 0, 0, 0],
+  		[50, 50, 50, 50, 50, 50, 50, 50],
+  		[10, 10, 20, 30, 30, 20, 10, 10],
+  		[5, 5, 10, 25, 25, 10, 5, 5],
+  		[0, 0, 0, 20, 20, 0, 0, 0],
+  		[5, -5, -10, 0, 0, -10, -5, 5],
+  		[5, 10, 10, -20, -20, 10, 10, 5],
+  		[0, 0, 0, 0, 0, 0, 0, 0]
+  	],
+  // knight
+  n: [
+  		[-50, -40, -30, -30, -30, -30, -40, -50],
+  		[-40, -20, 0, 0, 0, 0, -20, -40],
+  		[-30, 0, 10, 15, 15, 10, 0, -30],
+  		[-30, 5, 15, 20, 20, 15, 5, -30],
+  		[-30, 0, 15, 20, 20, 15, 0, -30],
+  		[-30, 5, 10, 15, 15, 10, 5, -30],
+  		[-40, -20, 0, 5, 5, 0, -20, -40],
+  		[-50, -40, -30, -30, -30, -30, -40, -50]
+  	],
+  // bishop
+  b: [
+  		[-20, -10, -10, -10, -10, -10, -10, -20],
+  		[-10, 0, 0, 0, 0, 0, 0, -10],
+  		[-10, 0, 5, 10, 10, 5, 0, -10],
+  		[-10, 5, 5, 10, 10, 5, 5, -10],
+  		[-10, 0, 10, 10, 10, 10, 0, -10],
+  		[-10, 10, 10, 10, 10, 10, 10, -10],
+  		[-10, 5, 0, 0, 0, 0, 5, -10],
+  		[-20, -10, -10, -10, -10, -10, -10, -20]
+  	],
+  // rook
+  r: [
+  		[0, 0, 0, 0, 0, 0, 0, 0],
+  		[5, 10, 10, 10, 10, 10, 10, 5],
+  		[-5, 0, 0, 0, 0, 0, 0, -5],
+  		[-5, 0, 0, 0, 0, 0, 0, -5],
+  		[-5, 0, 0, 0, 0, 0, 0, -5],
+  		[-5, 0, 0, 0, 0, 0, 0, -5],
+  		[-5, 0, 0, 0, 0, 0, 0, -5],
+  		[0, 0, 0, 5, 5, 0, 0, 0]
+  	],
+  // queen
+  q: [
+  		[-20, -10, -10, -5, -5, -10, -10, -20],
+  		[-10, 0, 0, 0, 0, 0, 0, -10],
+  		[-10, 0, 5, 5, 5, 5, 0, -10],
+  		[-5, 0, 5, 5, 5, 5, 0, -5],
+  		[0, 0, 5, 5, 5, 5, 0, -5],
+  		[-10, 5, 5, 5, 5, 5, 0, -10],
+  		[-10, 0, 5, 0, 0, 0, 0, -10],
+  		[-20, -10, -10, -5, -5, -10, -10, -20]
+  	],
+  // king middle game
+  k: [
+  		[-30, -40, -40, -50, -50, -40, -40, -30],
+  		[-30, -40, -40, -50, -50, -40, -40, -30],
+  		[-30, -40, -40, -50, -50, -40, -40, -30],
+  		[-30, -40, -40, -50, -50, -40, -40, -30],
+  		[-20, -30, -30, -40, -40, -30, -30, -20],
+  		[-10, -20, -20, -20, -20, -20, -20, -10],
+  		 [20, 20, 0, 0, 0, 0, 20, 20],
+  		 [20, 30, 10, 0, 0, 10, 30, 20]
+  	],
   // Endgame King Table
   'k_e': [
             [-50, -40, -30, -20, -20, -30, -40, -50],
@@ -133,6 +141,10 @@ var pst_b = {
   'k_e': pst_w['k_e'].slice().reverse()
 }
 
+for (let i in pst_w) {
+  pst_w[i] = pst_w[i].flat();
+  pst_b[i] = pst_b[i].flat();
+};
 var pstOpponent = { 'w': pst_b, 'b': pst_w };
 var pstSelf = { 'w': pst_w, 'b': pst_b };
 
@@ -176,14 +188,17 @@ function copy(text) {
 
   document.body.removeChild(textArea);
 }
+function forObj(ob,f){
+  for(let i in ob)if(!isNaN(Number(i)))f(ob[i],i);
+}
 /* 
  * Evaluates the board at this point in time, 
  * using the material weights and piece square tables.
  */
 function evaluateBoard(move, prevSum, color)
 {
-  var from = [8 - parseInt(move.from[1]), move.from.charCodeAt(0) - 'a'.charCodeAt(0)];
-  var to = [8 - parseInt(move.to[1]), move.to.charCodeAt(0) - 'a'.charCodeAt(0)];
+  var from = [(8 - parseInt(move.from[1])) * 8 + (move.from.charCodeAt(0) - 'a'.charCodeAt(0))];
+  var to = [(8 - parseInt(move.to[1])) * 8 + (move.to.charCodeAt(0) - 'a'.charCodeAt(0))];
 
   // Change endgame behavior for kings
   if (prevSum < -1500)
@@ -191,21 +206,21 @@ function evaluateBoard(move, prevSum, color)
     if (move.piece === 'k') { move.piece = 'k_e' }
     else if (move.captured === 'k') { move.captured = 'k_e' }
   }
-
+  let mc = pstSelf[move.color];
+  mp = mc[move.piece];
   if ('captured' in move)
   {
     // Opponent piece was captured (good for us)
     if (move.color === color)
     {
-      prevSum += (weights[move.captured] + pstOpponent[move.color][move.captured][to[0]][to[1]]);
+      prevSum += (weights[move.captured] + pstOpponent[move.color][move.captured][to]);
     }
     // Our piece was captured (bad for us)
     else
     {
-      prevSum -= (weights[move.captured] + pstSelf[move.color][move.captured][to[0]][to[1]]);
+      prevSum -= (weights[move.captured] + mc[move.captured][to]);
     }
   }
-
   if (move.flags.includes('p'))
   {
     // NOTE: promote to queen for simplicity
@@ -214,14 +229,14 @@ function evaluateBoard(move, prevSum, color)
     // Our piece was promoted (good for us)
     if (move.color === color)
     {
-      prevSum -= (weights[move.piece] + pstSelf[move.color][move.piece][from[0]][from[1]]);
-      prevSum += (weights[move.promotion] + pstSelf[move.color][move.promotion][to[0]][to[1]]);
+      prevSum -= (weights[move.piece] + mp[from]);
+      prevSum += (weights[move.promotion] + mc[move.promotion][to]);
     }
     // Opponent piece was promoted (bad for us)
     else
     {
-      prevSum += (weights[move.piece] + pstSelf[move.color][move.piece][from[0]][from[1]]);
-      prevSum -= (weights[move.promotion] + pstSelf[move.color][move.promotion][to[0]][to[1]]);
+      prevSum += (weights[move.piece] + mp[from]);
+      prevSum -= (weights[move.promotion] + mc[move.promotion][to]);
     }
   }
   else
@@ -229,19 +244,21 @@ function evaluateBoard(move, prevSum, color)
     // The moved piece still exists on the updated board, so we only need to update the position value
     if (move.color !== color)
     {
-      prevSum += pstSelf[move.color][move.piece][from[0]][from[1]];
-      prevSum -= pstSelf[move.color][move.piece][to[0]][to[1]];
+      prevSum += mp[from];
+      prevSum -= mp[to];
     }
     else
     {
-      prevSum -= pstSelf[move.color][move.piece][from[0]][from[1]];
-      prevSum += pstSelf[move.color][move.piece][to[0]][to[1]];
+      prevSum -= mp[from];
+      prevSum += mp[to];
     }
   }
 
   return prevSum;
 }
-
+function evaluateBoardNow(color="w"){
+  return game.board().reduce((t,a,r)=>t+a.reduce((h,b,c)=>h+(b?(weights[b.type]+pstSelf[b.color][b.type][r*8+c])*(color===b.color?1:-1):0),0),0)
+}
 /*
  * Performs the minimax algorithm to choose the best move: https://en.wikipedia.org/wiki/Minimax (pseudocode provided)
  * Recursively explores all possible moves up to a given depth, and evaluates the game board at the leaves.
@@ -265,25 +282,68 @@ function shuffle(array) {
          [array[i], array[j]] = [array[j], array[i]];
   }
 }
-function ID(game,color,currSum,timeLimit){
+
+function ID(game, color, currSum, timeLimit) {
   positionCount = 0;
-  let timestart=Date.now(),
-      timeend=timestart+timeLimit,
-      maxDepth=4,
-      bestMove,bestMoveValue,
-      dis=1;
-  for(;dis<=maxDepth;dis++){
-    let p=minimax(game,dis,-inf,inf,true,currSum,color,true,timeend);
-    if(p[0]!==-69)[bestMove, bestMoveValue]=p;
-    else {dis--;break};
+  let timestart = Date.now(),
+    timeend = timestart + timeLimit,
+    maxDepth = 4,
+    bestMove, bestMoveValue,
+    dis = 1;
+  for (; dis <= maxDepth; dis++) {
+    let p = minimax(game, dis, -inf, inf, true, currSum, color, true, timeend);
+    if (p[0] !== -69)[bestMove, bestMoveValue] = p;
+    else { dis--; break };
     //write();
     //console.log(bestMove);
   }
-  var positionsPerS = (positionCount*1000 / timeLimit);
+  var positionsPerS = (positionCount * 1000 / timeLimit);
   console.log(`Positions seen:${positionCount}\nDepth:${dis--}\nAverage positions seen per second:${positionsPerS}\nMove:${bestMove.san}\nMove Value:${bestMoveValue}`);
   return [bestMove, bestMoveValue]
 }
-function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use = true,end=0)
+
+function quiescenceSearch(game, alpha, beta,isMaximizingPlayer, color="w",ln=0) {
+  var standPatValue = evaluateBoardNow(color);
+  evalt++;
+  if(ln===3)return standPatValue;
+  let delta = 929;
+  if (isMaximizingPlayer) {
+    if (standPatValue >= beta) {
+      return beta;
+    }
+    if (standPatValue < alpha - delta) return alpha;
+    alpha = (standPatValue > alpha) ? standPatValue : alpha;
+  } else {
+    if (standPatValue <= alpha) {
+      return alpha;
+    }
+    if (standPatValue > beta + delta) return beta;
+    beta = (standPatValue < beta) ? standPatValue : beta;
+  }//game.in_check()?true:
+  var moves = game.ugly_moves({ verbose: true }).filter(a=>game.in_check()?true:a.captured);
+
+  for (var i = 0; i < moves.length; i++) {
+    game.ugly_move(moves[i]);
+    var value = quiescenceSearch(game, alpha, beta,!isMaximizingPlayer, color,ln+1);
+    game.undo();
+
+    if (isMaximizingPlayer) {
+      if (value >= beta) {
+        return beta;
+      }
+      alpha = (value > alpha) ? value : alpha; // max player (white)
+    } else {
+      if (value <= alpha) {
+        return alpha;
+      }
+      beta = (value < beta) ? value : beta; // min player (black)
+    }
+  }
+
+  return (isMaximizingPlayer ? alpha : beta);
+}
+
+function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use = true, end = 0,tabl={})
 {
   //if(end>0&&Date.now()>=end)return [-69,-420];
   //let g = table[game.fen().replace(/\//g, "&")];
@@ -310,11 +370,17 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
     };
     let fp = Object.keys(p).sort((a, b) => a - b);
     children = fp.map(a => p[a]).flat();
-  }*/
+  }
+  .sort(function(a, b) {
+    return (pieceValue[b.captured] / pieceValue[b.piece]) - (pieceValue[a.captured] / pieceValue[a.piece]);
+  });
+  .sort(function(a, b) {
+    return sortType[b.type] - sortType[a.type];
+  });
+  */
 
   children.sort(function(a, b) {
-    return (a.captured?(pieceValue[a.captured] || -1) - pieceValue[a.piece]:0)<
-    (b.captured?(pieceValue[b.captured] || -1) - pieceValue[b.piece]:0);
+    return (b.captured?pieceValue[b.captured] / pieceValue[b.piece]:0) - (a.captured?pieceValue[a.captured] / pieceValue[a.piece]:0);
   });
 
   var currMove;
@@ -328,10 +394,10 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
         return [null, inf / 2 + depth]
       }
     }
-    return [null, sum];
+    return [null, 0];
   }
-  else if(depth === 0){
-    return [null, sum];
+  else if (depth === 0) {
+    return [null, quiescenceSearch(game, alpha, beta,isMaximizingPlayer, color)];
   }
 
   // Find maximum/minimum from list of 'children' (possible moves)
@@ -341,11 +407,12 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
   for (var i = 0; i < children.length; i++)
   {
     currMove = children[i];
-
     // Note: in our case, the 'children' are simply modified game states
     var currPrettyMove = game.ugly_move(currMove);
-    var newSum = evaluateBoard(currPrettyMove, sum, color);
-    var [childBestMove, childValue] = minimax(game, depth - 1, alpha, beta, !isMaximizingPlayer, newSum, color, false,end);
+    tabl[currPrettyMove.san]={};
+    //var newSum = evaluateBoard(currPrettyMove, sum, color);
+    var [childBestMove, childValue,ttt] = minimax(game, depth - 1, alpha, beta, !isMaximizingPlayer, 0, color, false, end,tabl[currPrettyMove.san]);
+    if(!childBestMove)tabl[currPrettyMove.san]=childValue;
     //if(childBestMove===-69)return [-69,-420];
 
     game.undo();
@@ -356,6 +423,8 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
       {
         maxValue = childValue;
         bestMove = currPrettyMove;
+        tabl={[bestMove.san]:tabl[bestMove.san]};
+        //for(let i in tabl)if(i!==bestMove.san)delete tabl[i];
       }
       if (childValue > alpha)
       {
@@ -369,6 +438,7 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
       {
         minValue = childValue;
         bestMove = currPrettyMove;
+        tabl={[bestMove.san]:tabl[bestMove.san]};
       }
       if (childValue < beta)
       {
@@ -386,11 +456,11 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
   //if(!table[v] || table[v][2]<depth)table[v] = [bestMove, isMaximizingPlayer ? maxValue : minValue,depth];
   if (isMaximizingPlayer)
   {
-    return [bestMove, maxValue]
+    return [bestMove, maxValue,tabl]
   }
   else
   {
-    return [bestMove, minValue];
+    return [bestMove, minValue,tabl];
   }
 }
 
@@ -399,54 +469,55 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
  */
 function getBestMove(game, color, currSum, depth = 3) {
   positionCount = 0;
-
+  evalt=0;
   var d = new Date().getTime();
-  var [bestMove, bestMoveValue] = minimax(game, depth, -inf, inf, true, currSum, color);
+  var [bestMove, bestMoveValue,ttt] = minimax(game, depth, -inf, inf, true, currSum, color);
   var d2 = new Date().getTime();
   var moveTime = (d2 - d);
   var positionsPerS = (positionCount * 1000 / moveTime);
-  console.log(`Positions seen:${positionCount}\nMove Time:${moveTime/1000}\nAverage positions seen per second:${positionsPerS}\nMove:${bestMove.san}\nMove Value:${bestMoveValue}`)
+  console.log(`Positions seen:${positionCount}\nMove Time:${moveTime/1000}\nAverage positions seen per second:${positionsPerS}\nMove:${bestMove.san}\nMove Value:${bestMoveValue}\nEvaluations:${evalt}\nLine:${JSON.stringify(ttt)}`)
   return [bestMove, bestMoveValue];
 }
 
 /* 
  * Makes the best legal move for the given color.
  */
-function makeBestMove(color, depth = 3, timeLimit=0) {
-  var fc=timeLimit?ID:getBestMove;
-  move = fc(game, color, globalSum * ((color === 'b') ? 1 : -1), timeLimit?timeLimit:depth)[0];
+function makeBestMove(color, depth = 3, timeLimit = 0) {
+  var move,
+  sd=evaluateBoardNow(color);
+  if(!(move=randomOpening())){
+  var fc = timeLimit ? ID : getBestMove;
+  move = fc(game, color, globalSum * ((color === 'b') ? 1 : -1), timeLimit ? timeLimit : depth)[0];
   //if (!move) alert(game.fen())
-  globalSum = evaluateBoard(move, globalSum, 'b');
-  updateAdvantage();
-
-  game.move(move);
-  board.position(game.fen());
+ //evaluateBoard(move, globalSum, 'b');
+  playMove(move);
+  console.log("Advantage Change:"+(evaluateBoardNow(color)-sd))}
 
   if (color === 'w')
   {
     checkStatus('black');
 
     // Highlight black move
-    $board.find('.' + squareClass).removeClass('highlight-white')
-    $board.find('.square-' + move.from).addClass('highlight-white')
+    forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-white'))
+    forObj($board.querySelectorAll('.square-' + move.from),a=>a.classList.add('highlight-white'))
     squareToHighlight = move.to
     colorToHighlight = 'white'
 
-    $board.find('.square-' + squareToHighlight)
-      .addClass('highlight-' + colorToHighlight)
+    forObj($board.querySelectorAll('.square-' + squareToHighlight),a=>a
+      .classList.add('highlight-' + colorToHighlight))
   }
   else
   {
     checkStatus('white');
 
     // Highlight white move
-    $board.find('.' + squareClass).removeClass('highlight-black')
-    $board.find('.square-' + move.from).addClass('highlight-black')
+    forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-black'))
+    forObj($board.querySelectorAll('.square-' + move.from),a=>a.classList.add('highlight-black'))
     squareToHighlight = move.to
     colorToHighlight = 'black'
 
-    $board.find('.square-' + squareToHighlight)
-      .addClass('highlight-' + colorToHighlight)
+    forObj($board.querySelectorAll('.square-' + squareToHighlight),a=>a
+      .classList.add('highlight-' + colorToHighlight))
   }
   refresh();
   //write();
@@ -457,30 +528,39 @@ function makeBestMove(color, depth = 3, timeLimit=0) {
  */
 function compVsComp(color = startColour)
 {
-  notify(color);
-  if (!checkStatus(color))
-  {
-    timer = window.setTimeout(function() {
-      makeBestMove(color.charAt(0),depthed);
+  if (!checkStatus(color)){
+    notify(color);
+    timer = setTimeout(function() {
+      makeBestMove(color.charAt(0), depthed);
       if (color === 'white') { color = 'black' }
       else { color = 'white' }
       compVsComp(color);
     }, 250);
   }
+  else{
+    alert("Game over");
+  }
 }
-
-/*
+function playMove(m){
+  let mv=game.move(m);
+  board.position(game.fen());
+  globalSum = evaluateBoardNow("b");
+  updateAdvantage();
+  setOpening();
+  return mv;
+}
+/*x
  * Resets the game to its initial state.
  */
 function reset() {
   game.reset(x);
   globalSum = 0;
-  $board.find('.' + squareClass).removeClass('highlight-white');
-  $board.find('.' + squareClass).removeClass('highlight-black');
-  $board.find('.' + squareClass).removeClass('highlight-hint')
+  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-white'));
+  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-black'));
+  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-hint'))
   board.position(game.fen());
-  $('#advantageColor').text('Neither side');
-  $('#advantageNumber').text(globalSum);
+  document.querySelector('#advantageColor').text('Neither side');
+  document.querySelector('#advantageNumber').text(globalSum);
 
   // Kill the Computer vs. Computer callback
   if (timer)
@@ -512,14 +592,6 @@ $('#sicilianDefenseBtn').on('click', function() {
 $('#startBtn').on('click', function() {
     reset();
 })
-
-$('#compVsCompBtn').on('click', function() {
-    reset();
-    compVsComp('w');
-})
-$('#resetBtn').on('click', function() {
-    reset();
-})
 */
 var undo_stack = [];
 
@@ -533,28 +605,28 @@ function undo()
   {
     undo_stack.shift();
   }
-  $board.find('.' + squareClass).removeClass('highlight-white');
-  $board.find('.' + squareClass).removeClass('highlight-black');
-  $board.find('.' + squareClass).removeClass('highlight-hint')
+  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-white'));
+  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-black'));
+  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-hint'));
   board.position(game.fen());
-  checkStatus(game.turn()==="w"?"white":"black");
+  checkStatus(game.turn() === "w" ? "white" : "black");
+  globalSum = evaluateBoardNow("b");
   updateAdvantage();
-}
-function redo(){
-  game.move(undo_stack.pop())
-  board.position(game.fen());
-  checkStatus(game.turn()==="w"?"white":"black");
-  updateAdvantage();
+  setOpening()
 }
 
-$('#showHint').change(function() {
+function redo() {
+  playMove(undo_stack.pop())
+}
+
+/*document.querySelector('#showHint').addEventListener("change",function() {
   window.setTimeout(showHint, 250);
-})
+});*/
 
 function showHint()
 {
   var showHint = document.getElementById("showHint");
-  $board.find('.' + squareClass).removeClass('highlight-hint');
+  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-hint'));
 
   // Show hint (best move for white)
   if (!showHint.checked)
@@ -562,40 +634,40 @@ function showHint()
     var move = getBestMove(game, 'w', -globalSum)[0];
     console.log(move)
 
-    $board.find('.square-' + move.from).addClass('highlight-hint');
-    $board.find('.square-' + move.to).addClass('highlight-hint');
+    forObj($board.querySelectorAll('.square-' + move.from),a=>a.classList.add('highlight-hint'));
+    forObj($board.querySelectorAll('.square-' + move.to),a=>a.classList.add('highlight-hint'));
   }
 }
 
 function checkStatus(color) {
   if (game.in_checkmate())
   {
-    $('#status').html(`<b>Checkmate!</b> <b>${capitalize(color)}</b> lost.`);
+    document.querySelector('#status').innerHTML=(`<b>Checkmate!</b> <b>${capitalize(color)}</b> lost.`);
   }
   else if (game.insufficient_material())
   {
-    $('#status').html(`It's a <b>draw!</b> (Insufficient Material)`);
+    document.querySelector('#status').innerHTML=(`It's a <b>draw!</b> (Insufficient Material)`);
   }
   else if (game.in_threefold_repetition())
   {
-    $('#status').html(`It's a <b>draw!</b> (Threefold Repetition)`);
+    document.querySelector('#status').innerHTML=(`It's a <b>draw!</b> (Threefold Repetition)`);
   }
   else if (game.in_stalemate())
   {
-    $('#status').html(`It's a <b>draw!</b> (Stalemate)`);
+    document.querySelector('#status').innerHTML=(`It's a <b>draw!</b> (Stalemate)`);
   }
   else if (game.in_draw())
   {
-    $('#status').html(`It's a <b>draw!</b> (50-move Rule)`);
+    document.querySelector('#status').innerHTML=(`It's a <b>draw!</b> (50-move Rule)`);
   }
   else if (game.in_check())
   {
-    $('#status').html(`<b>${capitalize(color)}</b> is in <b>check!</b>`);
+    document.querySelector('#status').innerHTML=(`<b>${capitalize(color)}</b> is in <b>check!</b>`);
     return false;
   }
   else
   {
-    $('#status').html(`${capitalize(color)}'s turn to move.`)
+    document.querySelector('#status').innerHTML=`${capitalize(color)}'s turn to move.`
     return false;
   }
   return true;
@@ -604,27 +676,25 @@ function checkStatus(color) {
 function updateAdvantage()
 {
   let x = (-globalSum + 2000),
-    y = Math.round((x / 2000 - 1)*10000)/1000;
+    y = Math.round((x / 2000 - 1) * 10000) / 1000;
   if (globalSum > 0)
   {
-    $('#advantageColor').text('Black');
-    $('#advantageNumber').text(-y);
+    document.querySelector('#advantageColor').innerText=('Black');
+    document.querySelector('#advantageNumber').innerText=(-y);
   }
   else if (globalSum < 0)
   {
-    $('#advantageColor').text('White');
-    $('#advantageNumber').text(y);
+    document.querySelector('#advantageColor').innerText=('White');
+    document.querySelector('#advantageNumber').innerText=(y);
   }
   else
   {
-    $('#advantageColor').text('Neither side');
-    $('#advantageNumber').text(y);
+    document.querySelector('#advantageColor').innerText=('Neither side');
+    document.querySelector('#advantageNumber').innerText=(y);
   }
   if (x < 0) x = 0;
   if (x > 4000) x = 4000;
-  $('#advantageBar').attr({
-    style: `width: ${x / 4000 * 100}%`,
-  });
+  document.querySelector('#advantageBar').style.width=(x / 4000 * 100)+"%";
 }
 
 
@@ -633,17 +703,17 @@ function updateAdvantage()
  * https://chessboardjs.com/examples#5000
  */
 function removeGreySquares() {
-  $('#myBoard .square-55d63').css('background', '')
+  forObj(document.querySelectorAll('#myBoard .square-55d63'),a=>a.style.background="");
 }
 
 function greySquare(square) {
-  var $square = $('#myBoard .square-' + square)
+  var $square = document.querySelector('#myBoard .square-' + square)
 
   var background = whiteSquareGrey
-  if ($square.hasClass('black-3c85d')) {
+  if ($square.classList.contains('black-3c85d')) {
     background = blackSquareGrey
   }
-  $square.css('background', background)
+  $square.style.background=background
 }
 
 function onDragStart(square, piece) {
@@ -687,25 +757,26 @@ function onDrop(source, target) {
   // Illegal move
   if (move === null) return 'snapback'
 
-  globalSum = evaluateBoard(move, globalSum, 'b');
+  globalSum = evaluateBoardNow('b');
   updateAdvantage();
 
   // Highlight latest move
-  $board.find('.' + squareClass).removeClass('highlight-white')
+  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-white'))
 
-  $board.find('.square-' + move.from).addClass('highlight-white')
+  forObj($board.querySelectorAll('.square-' + move.from),a=>a.classList.add('highlight-white'))
   squareToHighlight = move.to
   colorToHighlight = 'white'
 
-  $board.find('.square-' + squareToHighlight)
-    .addClass('highlight-' + colorToHighlight)
+  forObj($board.querySelectorAll('.square-' + squareToHighlight),a=>a
+    .classList.add('highlight-' + colorToHighlight))
   refresh();
+  setOpening();
   if (!checkStatus(startColour));
   {
-    // Make the best move for black
-    /*window.setTimeout(function() {
-      makeBestMove(startColour.charAt(0),4);
-    }, 250)*/
+    if(againstAI){notify(startColour);setTimeout(function() {
+      makeBestMove(game.turn(),3);
+      notify(0);
+    }, 250);}
   }
 }
 
@@ -739,9 +810,11 @@ function refresh() {
 function onSnapEnd() {
   board.position(game.fen())
 }
-function capitalize(text){
-  return text.charAt(0).toUpperCase()+text.slice(1);
+
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
+
 function moveAll(arr) {
   for (let i = 0; i < arr.length; i++) setTimeout(() => {
     game.move(arr[i]);
@@ -755,10 +828,9 @@ function generateRandom(n) {
   board.position(game.fen());
   refresh();
 }
-function notify(color){
-  let notif=document.getElementById("notif");
-  if(color!==0)notif.innerText=capitalize(color)+" is thinking...";
-  else notif.innerText="Nothing is happening right now...";
+
+function notify(color) {
+  if (color !== 0) document.querySelector('#status').innerHTML=capitalize(color)+" is thinking...";
 }
 
 function loadBoard(fen) {
@@ -766,10 +838,20 @@ function loadBoard(fen) {
   board.position(fen);
   refresh();
 }
-let el=document.getElementById("aibt")
-el.addEventListener("click",e=>{
-  if(timer){el.innerText="AI vs AI";clearTimeout(timer);timer=undefined;notify(0)}
-  else {el.innerText="Stop";compVsComp();};
+let el = document.getElementById("aibt"),
+em=document.getElementById("avbt");
+el.addEventListener("click", e => {
+  if (timer) { el.innerText = "AI vs AI";
+    clearTimeout(timer);
+    timer = undefined;
+    notify(0) }
+  else { el.innerText = "Stop";
+    compVsComp(); };
+})
+em.addEventListener("click",e=>{
+  againstAI=!againstAI;
+  if(againstAI)em.innerText="Stop";
+  else em.innerText="Against AI";
 })
 //loadBoard("1k1r4/1pp4p/p7/4p3/8/P5P1/1PP4P/2K1R3 w - - 1 1");
 //loadBoard("r3k2r/pp1n1ppp/1q1bpn2/1N1p2Nb/3P4/3BQ1P1/PPP2P1P/R1B2RK1 b kq - 4 13")
