@@ -44,7 +44,8 @@ var config = {
 board = Chessboard('myBoard', config)
 
 timer = null;
-$board.addEventListener("touchmove",e=>e.preventDefault())
+$board.addEventListener("touchmove",e=>e.preventDefault());
+addEventListener('resize', () => board.resize());
 
 /* 
  * Piece Square Tables, adapted from Sunfish.py:
@@ -482,10 +483,13 @@ function getBestMove(game, color, currSum, depth = 3) {
 /* 
  * Makes the best legal move for the given color.
  */
-function makeBestMove(color, depth = 3, timeLimit = 0) {
+function makeBestMove(color, depth = 3,book=true, timeLimit = 0) {
   var move,
   sd=evaluateBoardNow(color);
-  if(!(move=randomOpening())){
+  if(!book || !(move=randomOpening())){
+    let m=game.moves().length;
+    if (m < 25) depth = 4;
+    else depth = 3;
   var fc = timeLimit ? ID : getBestMove;
   move = fc(game, color, globalSum * ((color === 'b') ? 1 : -1), timeLimit ? timeLimit : depth)[0];
   //if (!move) alert(game.fen())
@@ -537,9 +541,6 @@ function compVsComp(color = startColour)
       compVsComp(color);
     }, 250);
   }
-  else{
-    alert("Game over");
-  }
 }
 function playMove(m){
   let mv=game.move(m);
@@ -559,8 +560,8 @@ function reset() {
   forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-black'));
   forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-hint'))
   board.position(game.fen());
-  document.querySelector('#advantageColor').text('Neither side');
-  document.querySelector('#advantageNumber').text(globalSum);
+  document.querySelector('#advantageColor').innerText='Neither side';
+  document.querySelector('#advantageNumber').innerText=globalSum;
 
   // Kill the Computer vs. Computer callback
   if (timer)
@@ -831,6 +832,7 @@ function generateRandom(n) {
 
 function notify(color) {
   if (color !== 0) document.querySelector('#status').innerHTML=capitalize(color)+" is thinking...";
+  else checkStatus(startColour); 
 }
 
 function loadBoard(fen) {
