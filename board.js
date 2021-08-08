@@ -149,6 +149,21 @@ for (let i in pst_w) {
 var pstOpponent = { 'w': pst_b, 'b': pst_w };
 var pstSelf = { 'w': pst_w, 'b': pst_b };
 
+function addSound(type){
+  var audio = document.createElement('audio');
+  audio.id=type+"n";
+  audio.style.display = "none";
+  audio.src = "./sounds/"+type+".wav";
+  document.body.appendChild(audio);
+}
+function playSound(type="move") {
+  let sound=document.getElementById(type+"n");
+  sound.pause();
+  sound.currentTime=0;
+  sound.play();
+  //new Audio("./sounds/"+type+".wav").play();
+}
+for(let a of ["move","capture","check","castle","checkmate","draw"])addSound(a);
 function copy(text) {
   var textArea = document.createElement("textarea");
   // Place in the top-left corner of screen regardless of scroll position.
@@ -321,8 +336,10 @@ function quiescenceSearch(game, alpha, beta,isMaximizingPlayer, color="w",ln=0) 
     if (standPatValue > beta + delta) return beta;
     beta = (standPatValue < beta) ? standPatValue : beta;
   }//game.in_check()?true:
-  var moves = game.ugly_moves({ verbose: true }).filter(a=>game.in_check()?true:a.captured);
-
+  //var moves = game.ugly_moves({ verbose: true }).filter(a=>ck?true:a.captured);
+  let ck = game.in_check(),
+    moves = game.ugly_moves({ verbose: true }).filter(a => ck ? true : a.captured);
+  //if (moves.length===0) return ((isMaximizingPlayer && ck)||(!isMaximizingPlayer && !ck)) ? -inf / 2 : inf/2;
   for (var i = 0; i < moves.length; i++) {
     game.ugly_move(moves[i]);
     var value = quiescenceSearch(game, alpha, beta,!isMaximizingPlayer, color,ln+1);
@@ -344,7 +361,7 @@ function quiescenceSearch(game, alpha, beta,isMaximizingPlayer, color="w",ln=0) 
   return (isMaximizingPlayer ? alpha : beta);
 }
 
-function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use = true, end = 0,tabl={})
+function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use = true, end = 0)
 {
   //if(end>0&&Date.now()>=end)return [-69,-420];
   //let g = table[game.fen().replace(/\//g, "&")];
@@ -410,10 +427,8 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
     currMove = children[i];
     // Note: in our case, the 'children' are simply modified game states
     var currPrettyMove = game.ugly_move(currMove);
-    tabl[currPrettyMove.san]={};
     //var newSum = evaluateBoard(currPrettyMove, sum, color);
-    var [childBestMove, childValue,ttt] = minimax(game, depth - 1, alpha, beta, !isMaximizingPlayer, 0, color, false, end,tabl[currPrettyMove.san]);
-    if(!childBestMove)tabl[currPrettyMove.san]=childValue;
+    var [childBestMove, childValue,ttt] = minimax(game, depth - 1, alpha, beta, !isMaximizingPlayer, 0, color, false, end);
     //if(childBestMove===-69)return [-69,-420];
 
     game.undo();
@@ -424,8 +439,6 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
       {
         maxValue = childValue;
         bestMove = currPrettyMove;
-        tabl={[bestMove.san]:tabl[bestMove.san]};
-        //for(let i in tabl)if(i!==bestMove.san)delete tabl[i];
       }
       if (childValue > alpha)
       {
@@ -439,7 +452,6 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
       {
         minValue = childValue;
         bestMove = currPrettyMove;
-        tabl={[bestMove.san]:tabl[bestMove.san]};
       }
       if (childValue < beta)
       {
@@ -457,11 +469,11 @@ function minimax(game, depth, alpha, beta, isMaximizingPlayer, sum, color, use =
   //if(!table[v] || table[v][2]<depth)table[v] = [bestMove, isMaximizingPlayer ? maxValue : minValue,depth];
   if (isMaximizingPlayer)
   {
-    return [bestMove, maxValue,tabl]
+    return [bestMove, maxValue]
   }
   else
   {
-    return [bestMove, minValue,tabl];
+    return [bestMove, minValue];
   }
 }
 
@@ -472,59 +484,27 @@ function getBestMove(game, color, currSum, depth = 3) {
   positionCount = 0;
   evalt=0;
   var d = new Date().getTime();
-  var [bestMove, bestMoveValue,ttt] = minimax(game, depth, -inf, inf, true, currSum, color);
+  var [bestMove, bestMoveValue] = minimax(game, depth, -inf, inf, true, currSum, color);
   var d2 = new Date().getTime();
   var moveTime = (d2 - d);
   var positionsPerS = (positionCount * 1000 / moveTime);
-  console.log(`Positions seen:${positionCount}\nMove Time:${moveTime/1000}\nAverage positions seen per second:${positionsPerS}\nMove:${bestMove.san}\nMove Value:${bestMoveValue}\nEvaluations:${evalt}\nLine:${JSON.stringify(ttt)}`)
+  console.log(`Positions seen:${positionCount}\nMove Time:${moveTime/1000}\nAverage positions seen per second:${positionsPerS}\nMove:${bestMove.san}\nMove Value:${bestMoveValue}\nEvaluations:${evalt}`)
   return [bestMove, bestMoveValue];
 }
 
 /* 
  * Makes the best legal move for the given color.
  */
-function makeBestMove(color, depth = 3,book=true, timeLimit = 0) {
+function makeBestMove(color, depth = 3, book=true, timeLimit = 0) {
   var move,
-  sd=evaluateBoardNow(color);
+  sd=evaluateBoardNow(game.turn());
   if(!book || !(move=randomOpening())){
-    let m=game.moves().length;
-    if (m < 25) depth = 4;
-    else depth = 3;
-  var fc = timeLimit ? ID : getBestMove;
-  move = fc(game, color, globalSum * ((color === 'b') ? 1 : -1), timeLimit ? timeLimit : depth)[0];
-  //if (!move) alert(game.fen())
- //evaluateBoard(move, globalSum, 'b');
+    var fc = timeLimit ? ID : getBestMove;
+    move = fc(game, game.turn(), 0, timeLimit ? timeLimit : depth)[0];
   playMove(move);
-  console.log("Advantage Change:"+(evaluateBoardNow(color)-sd))}
-
-  if (color === 'w')
-  {
-    checkStatus('black');
-
-    // Highlight black move
-    forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-white'))
-    forObj($board.querySelectorAll('.square-' + move.from),a=>a.classList.add('highlight-white'))
-    squareToHighlight = move.to
-    colorToHighlight = 'white'
-
-    forObj($board.querySelectorAll('.square-' + squareToHighlight),a=>a
-      .classList.add('highlight-' + colorToHighlight))
+  console.log("Advantage Change:"+(evaluateBoardNow(color)-sd))
   }
-  else
-  {
-    checkStatus('white');
-
-    // Highlight white move
-    forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-black'))
-    forObj($board.querySelectorAll('.square-' + move.from),a=>a.classList.add('highlight-black'))
-    squareToHighlight = move.to
-    colorToHighlight = 'black'
-
-    forObj($board.querySelectorAll('.square-' + squareToHighlight),a=>a
-      .classList.add('highlight-' + colorToHighlight))
-  }
-  refresh();
-  //write();
+  else playMove(move);
 }
 
 /* 
@@ -535,20 +515,52 @@ function compVsComp(color = startColour)
   if (!checkStatus(color)){
     notify(color);
     timer = setTimeout(function() {
-      makeBestMove(color.charAt(0), depthed);
-      if (color === 'white') { color = 'black' }
-      else { color = 'white' }
-      compVsComp(color);
+      makeBestMove(game.turn(), depthed);
+      compVsComp(color === 'white'?'black':'white');
     }, 250);
   }
 }
 function playMove(m){
-  let mv=game.move(m);
+  if(!m)return false;
+  let move=game.move(m);
   board.position(game.fen());
   globalSum = evaluateBoardNow("b");
   updateAdvantage();
   setOpening();
-  return mv;
+  if(move)playSound(
+    game.in_checkmate() ? "checkmate" :
+    game.in_draw() ? "draw" :
+    game.in_check() ? "check" :
+    (move.flags === "k" || move.flags === "q" || move.flags.includes("p")) ? "castle" :
+    ("captured" in move) ? "capture" : "move");
+    if (game.turn() === 'b')
+    {
+      checkStatus('black');
+    
+      // Highlight black move
+      forObj($board.querySelectorAll('.' + squareClass), a => a.classList.remove('highlight-white'))
+      forObj($board.querySelectorAll('.square-' + move.from), a => a.classList.add('highlight-white'))
+      squareToHighlight = move.to
+      colorToHighlight = 'white'
+    
+      forObj($board.querySelectorAll('.square-' + squareToHighlight), a => a
+        .classList.add('highlight-' + colorToHighlight))
+    }
+    else
+    {
+      checkStatus('white');
+    
+      // Highlight white move
+      forObj($board.querySelectorAll('.' + squareClass), a => a.classList.remove('highlight-black'))
+      forObj($board.querySelectorAll('.square-' + move.from), a => a.classList.add('highlight-black'))
+      squareToHighlight = move.to
+      colorToHighlight = 'black'
+    
+      forObj($board.querySelectorAll('.square-' + squareToHighlight), a => a
+        .classList.add('highlight-' + colorToHighlight))
+    }
+    refresh();
+  return move;
 }
 /*x
  * Resets the game to its initial state.
@@ -606,13 +618,43 @@ function undo()
   {
     undo_stack.shift();
   }
-  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-white'));
-  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-black'));
-  forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-hint'));
   board.position(game.fen());
-  checkStatus(game.turn() === "w" ? "white" : "black");
+  //checkStatus(game.turn() === "w" ? "white" : "black");
   globalSum = evaluateBoardNow("b");
   updateAdvantage();
+  playSound(
+    game.in_checkmate() ? "checkmate" :
+    game.in_draw() ? "draw" :
+    game.in_check() ? "check" :
+    (move.flags === "k" || move.flags === "q" || move.flags.charAt(0) === "p") ? "castle" :
+    move.captured ? "capture" : "move");
+  if (game.turn() === 'b')
+  {
+    checkStatus('black');
+  
+    // Highlight black move
+    forObj($board.querySelectorAll('.' + squareClass), a => a.classList.remove('highlight-white'))
+    forObj($board.querySelectorAll('.square-' + move.from), a => a.classList.add('highlight-white'))
+    squareToHighlight = move.to
+    colorToHighlight = 'white'
+  
+    forObj($board.querySelectorAll('.square-' + squareToHighlight), a => a
+      .classList.add('highlight-' + colorToHighlight))
+  }
+  else
+  {
+    checkStatus('white');
+  
+    // Highlight white move
+    forObj($board.querySelectorAll('.' + squareClass), a => a.classList.remove('highlight-black'))
+    forObj($board.querySelectorAll('.square-' + move.from), a => a.classList.add('highlight-black'))
+    squareToHighlight = move.to
+    colorToHighlight = 'black'
+  
+    forObj($board.querySelectorAll('.square-' + squareToHighlight), a => a
+      .classList.add('highlight-' + colorToHighlight))
+  }
+  refresh();
   setOpening()
 }
 
@@ -760,6 +802,12 @@ function onDrop(source, target) {
 
   globalSum = evaluateBoardNow('b');
   updateAdvantage();
+  playSound(
+    game.in_checkmate()?"checkmate":
+    game.in_draw()?"draw":
+    game.in_check()?"check":
+    (move.flags==="k"||move.flags==="q" || move.flags.includes("p"))?"castle":
+    ("captured" in move)?"capture":"move")
 
   // Highlight latest move
   forObj($board.querySelectorAll('.' + squareClass),a=>a.classList.remove('highlight-white'))

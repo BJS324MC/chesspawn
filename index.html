@@ -27,7 +27,7 @@
   <script>
     document.getElementById("myBoard").style.width=Math.min(innerWidth,innerHeight)/(innerWidth<400?1.1:1.9)+"px";
   </script>
-  <p id="opening"></p>
+  <p id="opening">Loading...</p>
   <br><span id="status"></span><span id="notif"></span><br><br>
   <button onclick='notify(startColour);setTimeout(()=>{makeBestMove(game.turn(),3);notify(0)},100)'>Play Best Move</button>
   <button id="aibt">AI vs AI</button>
