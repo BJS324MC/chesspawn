@@ -12,4 +12,5 @@ const csvStringToArray = strData => {
     copy = navigator.clipboard.writeText,
     forObj = (ob, f) => {
         for (let i in ob) if (!isNaN(Number(i))) f(ob[i], i);
-    };
+    },
+    capitalize = text =>  text.charAt(0).toUpperCase() + text.slice(1);

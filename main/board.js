@@ -30,7 +30,6 @@ function makeBestMove(depth = 3) {
  */
 function compVsComp(color = startColour) {
   if (!checkStatus(color)) {
-    notify(color);
     timer = setTimeout(function () {
       makeBestMove(game.turn(), depthed);
       compVsComp(color === 'white' ? 'black' : 'white');
@@ -151,7 +150,7 @@ function showHint() {
 
   // Show hint (best move for white)
   if (!showHint.checked) {
-    var move = getBestMove(game, 'w', -globalSum)[0];
+    var move = getBestMove()[0];
     console.log(move)
 
     forObj($board.querySelectorAll('.square-' + move.from), a => a.classList.add('highlight-hint'));
@@ -255,14 +254,12 @@ function onDrop(source, target) {
   var move = game.move({
     from: source,
     to: target,
-    promotion: 'q' // NOTE: always promote to a queen for example simplicity
+    promotion: 'q'
   })
 
   // Illegal move
   if (move === null) return 'snapback'
 
-  globalSum = evaluateBoardNow('b');
-  updateAdvantage();
   playSound(
     game.in_checkmate() ? "checkmate" :
       game.in_draw() ? "draw" :
@@ -279,16 +276,14 @@ function onDrop(source, target) {
 
   forObj($board.querySelectorAll('.square-' + squareToHighlight), a => a
     .classList.add('highlight-' + colorToHighlight))
-  refresh();
-  if (!checkStatus(startColour));
+  /*if (!checkStatus(startColour));
   {
     if (againstAI) {
-      notify(startColour); setTimeout(function () {
-        makeBestMove(game.turn(), 3);
-        notify(0);
+      setTimeout(function () {
+        makeBestMove();
       }, 250);
     }
-  }
+  }*/
 }
 
 function onMouseoverSquare(square, piece) {
@@ -322,29 +317,6 @@ function onSnapEnd() {
   board.position(game.fen())
 }
 
-function capitalize(text) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-function moveAll(arr) {
-  for (let i = 0; i < arr.length; i++) setTimeout(() => {
-    game.move(arr[i]);
-    board.position(game.fen());
-  }, 250 * i);
-}
-//moveAll(["d4","d5","Bf4","Nf6","e3","Nc6","c3","Bf5","Bd3","e6","Nf3","Be7","Nbd2"])
-//moveAll(["f4","e5","fxe5","Qh4","g3","Be7"])
-function generateRandom(n) {
-  for (let i = 0; i < n; i++) game.move(game.moves()[~~(game.moves().length * Math.random())]);
-  board.position(game.fen());
-  refresh();
-}
-
-function notify(color) {
-  if (color !== 0) document.querySelector('#status').innerHTML = capitalize(color) + " is thinking...";
-  else checkStatus(startColour);
-}
-
 function loadBoard(fen) {
   game.load(fen);
   board.position(fen);
@@ -357,7 +329,6 @@ el.addEventListener("click", e => {
     el.innerText = "AI vs AI";
     clearTimeout(timer);
     timer = undefined;
-    notify(0)
   }
   else {
     el.innerText = "Stop";
