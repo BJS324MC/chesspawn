@@ -8,16 +8,13 @@
   <title>Chess</title>
   <link rel="stylesheet" href="chess/chessboard-1.0.0.min.css">
   <link rel="stylesheet" href="style.css">
-  <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+  <script src="chess/jquery-1.12.4.min.js"></script>
   <script src="chess/chess.js"></script>
   <script src="chess/chessboard-1.0.0.min.js"></script>
+  <script src="main/stockfish.js"></script>
 </head>
 
 <body>
-  <script src="openings.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.7.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.7.0/firebase-database.js"></script>
-  <script src="database.js"></script>
   <div id="advantageBox">
     <div id='advantageBar'></div>
   </div>
@@ -27,16 +24,16 @@
   <script>
     document.getElementById("myBoard").style.width=Math.min(innerWidth,innerHeight)/(innerWidth<400?1.1:1.9)+"px";
   </script>
-  <p id="opening">Loading...</p>
   <br><span id="status"></span><span id="notif"></span><br><br>
-  <button onclick='notify(startColour);setTimeout(()=>{makeBestMove(game.turn(),3);notify(0)},100)'>Play Best Move</button>
+  <button onclick='makeBestMove(game.turn(),3)'>Play Best Move</button>
   <button id="aibt">AI vs AI</button>
   <button id="avbt">Against AI</button>
   <button onclick='undo()'>Undo</button>
   <button onclick='redo()'>Redo</button>
   <button onclick="board.flip()">Flip</button>
   <button onclick="copy(game.fen())">Copy FEN</button>
-  <script src="board.js"></script>
+  <script src="main/audio.js"></script>
+  <script src="main/board.js"></script>
 </body>
 
 </html>

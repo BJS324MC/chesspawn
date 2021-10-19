@@ -1,24 +1,21 @@
+@font-face {
+  font-family: "SourceCodePro";
+  src: url("./Source_Code_Pro/SourceCodePro-Regular.ttf") format("truetype");
+}
 body {
     font-size: 25pt;
     margin:10px;
     text-align: center;
     color:white;
     font-weight: bolder;
-    font-family: Arial;
-    background-image:linear-gradient(45deg,#FEAC5E,#C779D0,#4BC0C8);
+    font-family: SourceCodePro;
+    background-color: rgb(44, 27, 27);
 }
 html,body{
   overscroll-behavior-y: none
 }
 .highlight-hint{
   background-color: greenyellow
-}
-#opening{
-  font-size:13pt;
-  padding:3px;
-  color:#E5E7FF;
-  text-decoration: underline;
-  display:inline-block;
 }
 #myBoard{
   padding:2px;
@@ -49,10 +46,8 @@ html,body{
   background-color: aliceblue
 }
 button {
-  background-image:linear-gradient(90deg,#FEAC5E,#C779D0,#4BC0C8);
+  background-color:whitesmoke;
   padding:20px;
   margin:2px;
-  color:white;
-  border:2px solid white;
-  background-color: #4C9F6E;
+  font-family: SourceCodePro;
 }
