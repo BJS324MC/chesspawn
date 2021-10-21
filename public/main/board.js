@@ -1,6 +1,4 @@
 const $board = document.querySelector('#myBoard'),
-  $advantageColor = document.querySelector('#advantageColor'),
-  $advantageNumber = document.querySelector('#advantageNumber'),
   game = new Chess(),
   whiteSquareGrey = '#ff8880',
   blackSquareGrey = '#b56762',
@@ -9,64 +7,30 @@ const $board = document.querySelector('#myBoard'),
 let undo_stack = [];
 $board.addEventListener("touchmove", e => e.preventDefault());
 
-const makeBestMove = (depth = 3) => {
-  
+const afterMove = move => {
+  board.position(game.fen());
+  if (move) playSound(
+    game.in_checkmate() ? "checkmate" :
+      game.in_draw() ? "draw" :
+        game.in_check() ? "check" :
+          (move.flags === "k" || move.flags === "q" || move.flags.includes("p")) ? "castle" :
+            ("captured" in move) ? "capture" : "move");
+  const turn = game.turn() === 'b' ? "white" : "black";
+  forObj($board.querySelectorAll(`.${squareClass}`), a => a.classList.remove(`highlight-${turn}`));
+  forObj($board.querySelectorAll(`.square-${move.from}`), a => a.classList.add(`highlight-${turn}`));
+  forObj($board.querySelectorAll(`.square-${move.to}`), a => a.classList.add(`highlight-${turn}`));
+  reanalyse();
+  return move;
 },
   playMove = m => {
     if (!m) return false;
-    const move = game.move(m,{sloppy:true});
-    board.position(game.fen());
-    if (move) playSound(
-      game.in_checkmate() ? "checkmate" :
-        game.in_draw() ? "draw" :
-          game.in_check() ? "check" :
-            (move.flags === "k" || move.flags === "q" || move.flags.includes("p")) ? "castle" :
-              ("captured" in move) ? "capture" : "move");
-    if (game.turn() === 'b') {
-      forObj($board.querySelectorAll(`.${squareClass}`), a => a.classList.remove('highlight-white'))
-      forObj($board.querySelectorAll(`.square-${move.from}`), a => a.classList.add('highlight-white'))
-      squareToHighlight = move.to;
-      colorToHighlight = 'white';
-      forObj($board.querySelectorAll(`.square-${squareToHighlight}`), a => a.classList.add(`highlight-${colorToHighlight}`))
-    }
-    else {
-      forObj($board.querySelectorAll(`.${squareClass}`), a => a.classList.remove('highlight-black'))
-      forObj($board.querySelectorAll(`.square-${move.from}`), a => a.classList.add('highlight-black'))
-      squareToHighlight = move.to
-      colorToHighlight = 'black'
-
-      forObj($board.querySelectorAll(`.square-${squareToHighlight}`), a => a
-        .classList.add(`highlight-${colorToHighlight}`))
-    }
-    return move;
+    const move = game.move(m, { sloppy: true });
+    return afterMove(move);
   },
   undo = () => {
     const move = game.undo();
     undo_stack.push(move);
-    board.position(game.fen());
-    playSound(
-      game.in_checkmate() ? "checkmate" :
-        game.in_draw() ? "draw" :
-          game.in_check() ? "check" :
-            (move.flags === "k" || move.flags === "q" || move.flags.charAt(0) === "p") ? "castle" :
-              "captured" in move ? "capture" : "move");
-    if (game.turn() === 'b') {
-      forObj($board.querySelectorAll('.' + squareClass), a => a.classList.remove('highlight-white'))
-      forObj($board.querySelectorAll('.square-' + move.from), a => a.classList.add('highlight-white'))
-      squareToHighlight = move.to
-      colorToHighlight = 'white'
-
-      forObj($board.querySelectorAll('.square-' + squareToHighlight), a => a.classList.add('highlight-' + colorToHighlight))
-    }
-    else {
-      forObj($board.querySelectorAll('.' + squareClass), a => a.classList.remove('highlight-black'))
-      forObj($board.querySelectorAll('.square-' + move.from), a => a.classList.add('highlight-black'))
-      squareToHighlight = move.to
-      colorToHighlight = 'black'
-
-      forObj($board.querySelectorAll('.square-' + squareToHighlight), a => a
-        .classList.add('highlight-' + colorToHighlight))
-    }
+    return afterMove(move);
   },
   redo = () => playMove(undo_stack.pop()),
   showHint = () => {
@@ -78,157 +42,60 @@ const makeBestMove = (depth = 3) => {
       forObj($board.querySelectorAll('.square-' + move.from), a => a.classList.add('highlight-hint'));
       forObj($board.querySelectorAll('.square-' + move.to), a => a.classList.add('highlight-hint'));
     }
+  },
+  removeGreySquares = () => forObj(document.querySelectorAll('#myBoard .square-55d63'), a => a.style.background = ""),
+  greySquare = square => {
+    const $square = document.querySelector('#myBoard .square-' + square);
+    $square.style.background = $square.classList.contains('black-3c85d') ? blackSquareGrey : whiteSquareGrey;
+  },
+  updateAdvantage = cp => {
+    document.querySelector('#evaluation').innerText = cp / 200;
+    document.querySelector('#advantageBar').style.width = 100 - Math.min(100,Math.max(0,((2000 - cp) / 40))) + "%";
+  },
+  checkStatus = color =>
+    document.querySelector('#status').innerHTML =
+    game.in_checkmate() ? `<b>Checkmate.</b> <b>${capitalize(color)}</b> lost.`
+      : game.insufficient_material() ? "<b>Draw</b> by insufficient material"
+        : game.in_threefold_repetition() ? "<b>Draw</b> by threefold repetition"
+          : game.in_stalemate() ? "<b>Draw</b> by stalemate"
+            : game.in_draw() ? "<b>Draw</b> by 50-move rule."
+              : "",
+  onDragStart = (square, piece) => {
+    if (game.game_over() || (game.turn() === 'w' && piece.search(/^b/) !== -1) || (game.turn() === 'b' && piece.search(/^w/) !== -1))
+      return false;
+    game.moves({
+      square: square,
+      verbose: true
+    }).forEach(move => greySquare(move.to));
+  },
+  onDrop = (source, target) => {
+    undo_stack = [];
+    removeGreySquares();
+    const move = game.move({
+      from: source,
+      to: target,
+      promotion: 'q'
+    });
+    if (move === null) return 'snapback';
+    playSound(
+      game.in_checkmate() ? "checkmate" :
+        game.in_draw() ? "draw" :
+          game.in_check() ? "check" :
+            (move.flags === "k" || move.flags === "q" || move.flags.includes("p")) ? "castle" :
+              ("captured" in move) ? "capture" : "move");
+    forObj($board.querySelectorAll(`.${squareClass}`), a => a.classList.remove('highlight-white'));
+    forObj($board.querySelectorAll(`.square-${move.from}`), a => a.classList.add('highlight-white'));
+    forObj($board.querySelectorAll(`.square-${move.to}`), a => a.classList.add(`highlight-white`));
+    reanalyse();
+  },
+  onMouseoverSquare = (square, piece) => game.moves({ square: square, verbose: true }).forEach(move => greySquare(move.to)),
+  onMouseoutSquare = (square, piece) => removeGreySquares(),
+  onSnapEnd = () => board.position(game.fen()),
+  loadBoard = fen => {
+    game.load(fen);
+    board.position(fen);
+    reanalyse();
   }
-
-function checkStatus(color) {
-  if (game.in_checkmate()) {
-    document.querySelector('#status').innerHTML = (`<b>Checkmate!</b> <b>${capitalize(color)}</b> lost.`);
-  }
-  else if (game.insufficient_material()) {
-    document.querySelector('#status').innerHTML = (`It's a <b>draw!</b> (Insufficient Material)`);
-  }
-  else if (game.in_threefold_repetition()) {
-    document.querySelector('#status').innerHTML = (`It's a <b>draw!</b> (Threefold Repetition)`);
-  }
-  else if (game.in_stalemate()) {
-    document.querySelector('#status').innerHTML = (`It's a <b>draw!</b> (Stalemate)`);
-  }
-  else if (game.in_draw()) {
-    document.querySelector('#status').innerHTML = (`It's a <b>draw!</b> (50-move Rule)`);
-  }
-  else if (game.in_check()) {
-    document.querySelector('#status').innerHTML = (`<b>${capitalize(color)}</b> is in <b>check!</b>`);
-    return false;
-  }
-  else {
-    document.querySelector('#status').innerHTML = `${capitalize(color)}'s turn to move.`
-    return false;
-  }
-  return true;
-}
-
-function updateAdvantage() {
-  let x = (-globalSum + 2000),
-    y = Math.round((x / 2000 - 1) * 10000) / 1000;
-  if (globalSum > 0) {
-    $advantageColor.innerText = 'Black';
-    $advantageNumber.innerText = -y;
-  }
-  else if (globalSum < 0) {
-    $advantageColor.innerText = 'White';
-    $advantageNumber.innerText = y;
-  }
-  else {
-    $advantageColor.innerText = 'Neither side';
-    $advantageNumber.innerText = y;
-  }
-  if (x < 0) x = 0;
-  if (x > 4000) x = 4000;
-  document.querySelector('#advantageBar').style.width = (x / 4000 * 100) + "%";
-}
-
-function removeGreySquares() {
-  forObj(document.querySelectorAll('#myBoard .square-55d63'), a => a.style.background = "");
-}
-
-function greySquare(square) {
-  var $square = document.querySelector('#myBoard .square-' + square)
-
-  var background = whiteSquareGrey
-  if ($square.classList.contains('black-3c85d')) {
-    background = blackSquareGrey
-  }
-  $square.style.background = background
-}
-
-function onDragStart(square, piece) {
-  // do not pick up pieces if the game is over
-  if (game.game_over()) return false
-
-  // or if it's not that side's turn
-  if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
-    (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
-    return false
-  }
-
-  var moves = game.moves({
-    square: square,
-    verbose: true
-  })
-
-  // exit if there are no moves available for this square
-  if (moves.length === 0) return
-
-  // highlight the square they moused over
-  greySquare(square)
-
-  // highlight the possible squares for this piece
-  for (var i = 0; i < moves.length; i++) {
-    greySquare(moves[i].to)
-  }
-}
-
-function onDrop(source, target) {
-  undo_stack = [];
-  removeGreySquares();
-
-  // see if the move is legal
-  var move = game.move({
-    from: source,
-    to: target,
-    promotion: 'q'
-  })
-
-  // Illegal move
-  if (move === null) return 'snapback'
-
-  playSound(
-    game.in_checkmate() ? "checkmate" :
-      game.in_draw() ? "draw" :
-        game.in_check() ? "check" :
-          (move.flags === "k" || move.flags === "q" || move.flags.includes("p")) ? "castle" :
-            ("captured" in move) ? "capture" : "move")
-
-  // Highlight latest move
-  forObj($board.querySelectorAll(`.${squareClass}`), a => a.classList.remove('highlight-white'))
-
-  forObj($board.querySelectorAll(`.square-${move.from}`), a => a.classList.add('highlight-white'))
-
-  forObj($board.querySelectorAll(`.square-${move.to}`), a => a
-    .classList.add(`highlight-white`))
-}
-
-function onMouseoverSquare(square, piece) {
-  var moves = game.moves({
-    square: square,
-    verbose: true
-  });
-  if (moves.length === 0) return;
-  greySquare(square);
-  for (var i = 0; i < moves.length; i++) {
-    greySquare(moves[i].to);
-  }
-}
-const onMouseoutSquare = (square, piece) => removeGreySquares(),
-onSnapEnd = () => board.position(game.fen()),
-loadBoard = fen => {
-  game.load(fen);
-  board.position(fen);
-}
-/*const aibt = document.getElementById("aibt"),
-      avbt = document.getElementById("avbt");
-aibt.addEventListener("click", e => {
-  if (timer) {
-    aibt.innerText = "AI vs AI";
-    clearTimeout(timer);
-    timer = undefined;
-  }
-  else {
-    aibt.innerText = "Stop";
-    compVsComp();
-  };
-})
-avbt.addEventListener("click", e => avbt.innerText = (againstAI = !againstAI) ? "Stop" : "Against AI")*/
 
 const board = Chessboard('myBoard', {
   draggable: true,

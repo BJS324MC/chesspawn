@@ -18,12 +18,7 @@ html,body{
   background-color: greenyellow
 }
 #myBoard{
-  padding:2px;
-  margin:0 auto;
-  /*background-image:linear-gradient(45deg,#FEAC5E,#C779D0,#4BC0C8);
-  left:50%;
-  position:fixed;
-  transform: translate(-50%);*/
+  margin:50px;
 }
 #advantageBox{
   background-color: black;
@@ -34,9 +29,7 @@ html,body{
   background: white;
   width:50%;
   height:18px;
-}
-#advantageFile{
-  font-size:15pt;
+  transition:width 0.5s;
 }
 .highlight-white {
   background-color: limegreen
