@@ -32,7 +32,8 @@ const reanalyse = () => {
 let stockfish = null;
 
 if (isSupported()) (async () => {
-    stockfish = await Stockfish({ wasmBinary: await (await fetch("stockfish/stockfish.wasm")).arrayBuffer() });
+    //{ wasmBinary: await (await fetch("stockfish/stockfish.wasm")).arrayBuffer() }
+    stockfish = await Stockfish();
     stockfish.addMessageListener(e => {
         console.log(e);
         if (e.includes("currmove")) return;
